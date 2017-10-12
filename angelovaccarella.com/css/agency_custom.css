@@ -1,0 +1,31 @@
+.navbar-default .navbar-brand{
+	font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+	font-weight: 400;
+	letter-spacing: 1px;
+	color: #fff;
+}
+
+.navbar-brand {
+	float: left;
+	height: 50px;
+	padding: 15px 15px;
+	font-size: 16px;
+	line-height: 20px;
+}
+
+.cust-about-me {
+	padding-top: 25px;
+	padding-bottom: 25px;
+	padding-left: 30px;
+	padding-right: 30px;
+	color: #333;
+	font-size: 15px;
+}
+
+.logo-round {
+	border-radius: 50%;
+}
+
+h2 {
+	padding-bottom: 30px;
+}
