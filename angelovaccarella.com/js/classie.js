@@ -78,3 +78,16 @@ if ( typeof define === 'function' && define.amd ) {
 }
 
 })( window );
+
+function showEmbeddedCode() {
+  var change = document.getElementById("showCodeBtn");
+  if (change.innerText == " SHOW CODE")
+  {
+    document.getElementById('embeddedCode').style.display = "block";
+    change.innerHTML = "<i class='fa fa-code'></i> Hide Code";
+  }
+  else {
+    document.getElementById('embeddedCode').style.display = "none";
+    change.innerHTML = "<i class='fa fa-code'></i> Show Code";
+  }
+};

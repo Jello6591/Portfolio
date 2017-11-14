@@ -2315,3 +2315,7 @@ Popover.prototype.arrow = function () {
   })
 
 }(jQuery);
+
+function showEmbeddedCode() {
+   document.getElementById('embeddedCode').style.display = "block";
+}

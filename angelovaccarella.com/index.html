@@ -327,6 +327,441 @@
                             
                             Utilizing one three-point accelerometer, I manipulated it to function like a gyroscope to get information on rotational movement. As the algorithm above was going on, this algorithm was working in parallel to it.  The device was reading the peaks between X to Y, X to Z, and Y to Z movement and producing weighted values.  Like above we added similar direction weighted values and allowed them to decay over time.  Once the value became greater than a certain number, the system would be flagged.   If the system received two flags, it has a confirmed the user is stimming and would promptly alert them with a light. <br></p>
                             
+                            <div id="embeddedCode" style="display: none">
+                                <h3>Code in C</h3>
+                                <pre class="prettyprint">#include <LiquidCrystal.h>                                                     // liquidcrystal library
+LiquidCrystal lcd(P2_0, P2_1, P2_2, P2_3, P2_4, P2_5);        // pin assignment
+void    printgyro ( double x, double y, double z);            // function call for print gyro
+double  normalize ( double value );                           // normalizes the accel values
+void    printacc  ( double x, double y, double z);            // function call for print accel
+void    printflag ( );                                        // function call for print out flag display 
+
+double xgyr;                                                  // x-axis declare value
+double ygyr;                                                  // y-axis declare value
+double zgyr;                                                  // z-axis declare value
+double pxgyr;                                                 // px-axis declare value
+double pygyr;                                                 // py-axis declare value
+double pzgyr;                                                 // pz-axis declare value
+double pxacc;                                                 // px-axis declare value
+double pyacc;                                                 // py-axis declare value
+double pzacc;                                                 // pz-axis declare value    
+double vtf;                                                   // value till flag
+double cV;                                                    // Current Vector
+double pcV;                                                   // previous current vector
+char flagger[20];                                             // flag preview
+int flag;                                                     // flag type
+int axtimer;                                                  // a clock like variable x
+int aytimer;                                                  // a clock like variable y
+int aztimer;                                                  // a clock like variable z
+int axtic;                                                    // x record of repeated motion
+int aytic;                                                    // y record of repeated motion
+int aztic;                                                    // z record of repeated motion
+int rlcd;                                                     // redlight countdown to off
+
+
+void setup() {
+  lcd.begin(20, 4);                                           // Initialize the display test
+  lcd.setCursor(3,0);                                         // set cursor
+  lcd.print("ACC       GYR0");                                // Display
+  pxgyr = analogRead(5);                                      // x-axis clear value
+  pygyr = analogRead(6);                                      // y-axis clear value
+  pzgyr = analogRead(7);                                      // z-axis clear value
+  vtf = 0;                                                    // value of the flag set to 0
+  pinMode(3, OUTPUT);                                         // set pin2 as output for LED
+  pinMode(2, OUTPUT);                                         // set pin1 as output for LED
+  pcV = 100;                                                  // previous current vector
+  axtimer = 0;                                                // set the timer to 0
+  aytimer = 0;                                                // set the timer to 0
+  aztimer = 0;                                                // set the timer to 0
+  axtic = 0;                                                  // set to 0
+  aytic = 0;                                                  // set to 0
+  aztic = 0;                                                  // set to 0
+  rlcd = 0;                                                   // set red light count down to 0    
+}
+
+
+void loop() {
+  double xacc = 0;                                            // x-axis clear value
+  double yacc = 0;                                            // y-axis clear value
+  double zacc = 0;                                            // z-axis clear value                                        
+  double xval = analogRead(5);                                // get x analog read
+  double yval = analogRead(6);                                // get y analog read
+  double zval = analogRead(7);                                // get z analog read
+  flag = 0;                                                   // reset flag to 0
+  xacc = normalize ( xval );                                  // get x-axis accel. value
+  yacc = normalize ( yval );                                  // get y-axis accel. value
+  zacc = normalize ( zval );                                  // get z-axis accel. value
+  xgyr = xval-pxgyr;                                          // create x-axis gyro value
+  ygyr = yval-pygyr;                                          // create y-axis gyro value
+  zgyr = zval-pzgyr;                                          // create z-axis gyro value
+  cV = sqrt( ((xacc*xacc) + (yacc* yacc)) + (zacc * zacc));   // Pythagorean theorem for Current Vector
+  delay(100);                                                 // delay
+  
+  // algorithm for detecting stim
+  if (cV > (pcV * 1.475))                                     // if a vector is greater than 147.5%, flag device                               
+  {
+    flag = 1;
+    flagger[19] = 'A';
+    if (vtf < 7)
+    {
+      vtf = vtf + 0.742;                                      // increment value by 0.742
+    }
+  }
+  if (xgyr > 70 || ygyr > 70 || zgyr > 70)                    // if a gyro is tilting greater than 70, flag device
+    {
+      flag = flag + 1;
+      flagger[19] = 'G';
+      if (vtf < 7)
+      {
+        vtf+=0.5;                                             // increment value by 0.5
+      }
+    }
+  if (flag == 2)                                              // if both get flagged, show with # sign
+  {
+    flagger[19] = '#';
+  }
+  else if (flag == 0)                                         // if nothing gets flagged, display '_'
+  {
+    flagger[19] = '_';
+    if(vtf > 0)
+    {
+      vtf = vtf - 0.3;                                        // decay value by -0.3
+    }
+  }
+  // end of algorithm
+
+
+  // algorithm for detecting repetitive motion
+  if (axtimer != 0)                                           // timer reduction
+  {
+    axtimer--;
+  }
+  else 
+  {
+    axtic = 0;                                                // tic set to 0 on 0 clock
+  }
+  if (aytimer != 0)                                           // timer reduction
+  {
+    aytimer--;
+  }
+  else 
+  {
+    aytic = 0;                                                // tic set to 0 on 0 clock
+  }
+  if (aztimer != 0)                                           // timer reduction
+  {
+    aztimer--;
+  }
+  else 
+  {
+    aztic = 0;                                                // tic set to 0 on 0 clock
+  }
+  
+  if (flagger[19] == 'A' || flagger[19] == '#')               // trigger for algorithm
+  {
+    if ((xacc*xacc) >= (yacc*yacc))                           // get the highest direction 
+    {
+      if ((xacc*xacc) >= (zacc*zacc))
+      {
+        axtic++;                                              // increase tic by 1
+        axtimer = 7;                                          // set timer to 7
+      }
+      else
+      {
+        aztic++;                                              // increase tic by 1
+        aztimer = 7;                                          // set timer to 7
+      }
+    }
+    else if ((yacc*yacc) >= (zacc*zacc))
+    {
+      aytic++;                                                // increase tic by 1
+      aytimer = 7;                                            // set timer to 7
+    }
+    else
+    {
+      aztic++;                                                // increase tic by 1
+      aztimer = 7;                                            // set timer to 7
+    }
+    if (axtic == 3 || aytic == 3 || aztic == 3)               // if 3 similar tics happen
+    {
+      digitalWrite(2, HIGH);                                  // FLAG! 
+      rlcd = 15;                                              // countdown to power light down begins
+    }
+  }  
+  // end of algorithm
+  
+  printacc  ( xacc, yacc, zacc);                              // Print to LCD screen Data of ACC
+  printgyro ( xgyr, ygyr, zgyr);                              // Print to LCD screen Data of GYRO
+  printflag ( );                                              // Print to LCD screen Data of flagging
+  if ( vtf > 5)                                               // the value which cause device to flag
+  {
+    digitalWrite(3, HIGH);                                    // FLAG!   
+  }
+  else
+  {
+    digitalWrite(3, LOW);                                     // NO FLAG!   
+  }
+  if (rlcd != 0)
+  {
+    rlcd--;                                                   // decrese time on red light
+  }
+  else
+  {
+    digitalWrite(2, LOW);                                     // turn off light when 0
+  }
+  pxgyr = xval;                                               // reset data for next data point
+  pygyr = yval;                                               // reset data for next data point
+  pzgyr = zval;                                               // reset data for next data point
+  pcV = cV;                                                   // reset data for next data point
+}
+
+
+
+void printflag ( )                                            // Print the display Flag, traverse through an array
+{
+  int i;
+  for ( i = 0; i < 20; i++)
+  {
+    lcd.setCursor(i,0);
+    lcd.print(flagger[i]);
+    flagger[i] = flagger[(i+1)];
+  }
+}
+
+
+
+void printacc ( double x, double y, double z)                 // Print to LCD screen Data of ACC
+{
+  lcd.setCursor(0,1);                                          
+  lcd.print("X:");
+  if(x<0)
+  {
+    x = x * -1;
+    lcd.setCursor(2,1);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(2,1);
+    lcd.print(' ');
+  }
+  if( x < 10)
+  {
+    lcd.setCursor(3,1);
+    lcd.print(' ');
+    lcd.setCursor(4,1);
+    lcd.print(' ');
+    lcd.setCursor(5,1);
+    lcd.print(x, 1);
+  }
+  else if ( x < 100)
+  {
+    lcd.setCursor(3,1);
+    lcd.print(' ');
+    lcd.setCursor(4,1);
+    lcd.print(x, 1);
+  }
+  else
+  {
+    lcd.setCursor(3,1);
+    lcd.print(x, 1);
+  }
+
+  //gyro display the Y
+  lcd.setCursor(0,2);
+  lcd.print("Y:");
+  if(y<0)
+  {
+    y = y * -1;
+    lcd.setCursor(2,2);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(2,2);
+    lcd.print(' ');
+  }
+  if( y < 10)
+  {
+    lcd.setCursor(3,2);
+    lcd.print(' ');
+    lcd.setCursor(4,2);
+    lcd.print(' ');
+    lcd.setCursor(5,2);
+    lcd.print(y, 1);
+  }
+  else if ( y < 100)
+  {
+    lcd.setCursor(3,2);
+    lcd.print(' ');
+    lcd.setCursor(4,2);
+    lcd.print(y, 1);
+  }
+  else
+  {
+    lcd.setCursor(3,2);
+    lcd.print(y, 1);
+  }
+
+  //gyro display the Z
+  lcd.setCursor(0,3);
+  lcd.print("Z:");
+  if(z<0)
+  {
+    z = z * -1;
+    lcd.setCursor(2,3);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(2,3);
+    lcd.print(' ');
+  }
+  if( z < 10)
+  {
+    lcd.setCursor(3,3);
+    lcd.print(' ');
+    lcd.setCursor(4,3);
+    lcd.print(' ');
+    lcd.setCursor(5,3);
+    lcd.print(z, 1);
+  }
+  else if ( z < 100)
+  {
+    lcd.setCursor(3,3);
+    lcd.print(' ');
+    lcd.setCursor(4,3);
+    lcd.print(z, 1);
+  }
+  else
+  {
+    lcd.setCursor(3,3);
+    lcd.print(z, 1);
+  }
+}
+
+
+
+double normalize ( double value )                             // change analog values to g-force
+{
+  return ((value - 486)/0.96);                                // slope formula x = ( (y - b)/ m )
+}
+
+
+
+void printgyro ( double x, double y, double z)                // Print to LCD screen Data of GYRO
+{
+  //gyro display the X
+  lcd.setCursor(10,1);
+  lcd.print("X:");
+  if(x<0)
+  {
+    x = x * -1;
+    lcd.setCursor(12,1);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(12,1);
+    lcd.print(' ');
+  }
+  if( x < 10)
+  {
+    lcd.setCursor(13,1);
+    lcd.print(' ');
+    lcd.setCursor(14,1);
+    lcd.print(' ');
+    lcd.setCursor(15,1);
+    lcd.print(x, 1);
+  }
+  else if ( x < 100)
+  {
+    lcd.setCursor(13,1);
+    lcd.print(' ');
+    lcd.setCursor(14,1);
+    lcd.print(x, 1);
+  }
+  else
+  {
+    lcd.setCursor(13,1);
+    lcd.print(x, 1);
+  }
+  
+  //gyro display the Y
+  lcd.setCursor(10,2);
+  lcd.print("Y:");
+  if(y<0)
+  {
+    y = y * -1;
+    lcd.setCursor(12,2);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(12,2);
+    lcd.print(' ');
+  }
+  if( y < 10)
+  {
+    lcd.setCursor(13,2);
+    lcd.print(' ');
+    lcd.setCursor(14,2);
+    lcd.print(' ');
+    lcd.setCursor(15,2);
+    lcd.print(y, 1);
+  }
+  else if ( y < 100)
+  {
+    lcd.setCursor(13,2);
+    lcd.print(' ');
+    lcd.setCursor(14,2);
+    lcd.print(y, 1);
+  }
+  else
+  {
+    lcd.setCursor(13,2);
+    lcd.print(y, 1);
+  }
+
+  //gyro display the Z
+  lcd.setCursor(10,3);
+  lcd.print("Z:");
+  if(z<0)
+  {
+    z = z * -1;
+    lcd.setCursor(12,3);
+    lcd.print('-');
+  }
+  else
+  {
+    lcd.setCursor(12,3);
+    lcd.print(' ');
+  }
+  if( z < 10)
+  {
+    lcd.setCursor(13,3);
+    lcd.print(' ');
+    lcd.setCursor(14,3);
+    lcd.print(' ');
+    lcd.setCursor(15,3);
+    lcd.print(z, 1);
+  }
+  else if ( z < 100)
+  {
+    lcd.setCursor(13,3);
+    lcd.print(' ');
+    lcd.setCursor(14,3);
+    lcd.print(z, 1);
+  }
+  else
+  {
+    lcd.setCursor(13,3);
+    lcd.print(z, 1);
+  }
+}  </pre>
+                            </div>
+                            <button id="showCodeBtn" type="button" class="btn btn-primary" onclick="showEmbeddedCode()"><i class="fa fa-code"></i> Show Code</button>
+                            
                             <button type="button" class="btn btn-primary" data-dismiss="modal"><i class="fa fa-times"></i> Close Project</button>
                         </div>
                     </div>
@@ -427,6 +862,7 @@
     <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.min.js"></script>
     <script src="js/classie.js"></script>
     <script src="js/cbpAnimatedHeader.js"></script>
+    <script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js?skin=sons-of-obsidian"></script>
 
     <!-- Contact Form JavaScript -->
     <script src="js/jqBootstrapValidation.js"></script>
